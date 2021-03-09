@@ -13,7 +13,7 @@ def dxinf_dy(x,y,sigma):
     xinf = x_inf(x,y,sigma)
     return -sigma*xinf/(1-sigma*xinf)
 
-
+"""test"""
 
 def SIR_forward(qfun=None, beta=0.3, gamma=0.1, x0=0.99, y0=0.01, T=100):
     """ Model the current outbreak using the SIR model."""
