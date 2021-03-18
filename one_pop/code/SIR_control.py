@@ -45,12 +45,13 @@ def solve_pmp(beta=0.3, gamma=0.1, x0=0.99, y0=0.01, c1=1., c2=1.e-2, c3=0., yma
     sigma_min = (1-qmax)*sigma0
 
     def rhs(t, u):
+        rho = 2
         # Variables: x, y, lambda_1, lambda_2
         du = np.zeros((4,len(t)))
 
         alpha = expit(10*(u[1,:]-ymax))*(u[1,:]-ymax)
         
-        sigma = sigma0 - (u[3,:]-u[2,:])*gamma*u[1,:]*u[0,:]/(2*c2)
+        sigma = sigma0 - ((u[3,:]-u[2,:])*gamma*u[1,:]*u[0,:]/(rho*c2))**(1/(rho-1))
         sigma = np.maximum(sigma_min,np.minimum(sigma0,sigma))
 
         du[0,:] = -sigma*gamma*u[1,:]*u[0,:]
@@ -95,6 +96,62 @@ def solve_pmp(beta=0.3, gamma=0.1, x0=0.99, y0=0.01, c1=1., c2=1.e-2, c3=0., yma
     #print(result.message)
     return x, y, sigma, t, result.sol(tt)
 
+def solve_pmp_rho(rho=2, beta=0.3, gamma=0.1, x0=0.99, y0=0.01, c1=1., c2=1.e-2, c3=0., ymax=0.1, guess=None, T=100, qmax=1., N=1000):
+    sigma0 = beta/gamma
+    sigma_min = (1-qmax)*sigma0
+
+    def rhs(t, u):
+        # Variables: x, y, lambda_1, lambda_2
+        du = np.zeros((4,len(t)))
+
+        alpha = expit(10*(u[1,:]-ymax))*(u[1,:]-ymax)
+        
+        sigma = sigma0 - ((u[3,:]-u[2,:])*gamma*u[1,:]*u[0,:]/(rho*c2))**(1/(rho-1))
+        sigma = np.maximum(sigma_min,np.minimum(sigma0,sigma))
+
+        du[0,:] = -sigma*gamma*u[1,:]*u[0,:]
+        du[1,:] =  sigma*gamma*u[1,:]*u[0,:] - gamma*u[1]
+        du[2,:] = (u[2,:]-u[3,:])*sigma*gamma*u[1,:]
+        du[3,:] = (u[2,:]-u[3,:])*sigma*gamma*u[0,:] + u[3,:]*gamma - c3*alpha
+        return du
+
+    def bc(ua, ub):
+        xT = ub[0]; yT=ub[1]
+        lam2T = -c1*dxinf_dy(xT,yT,sigma0)
+        lam1T = lam2T*(1-1/(xT*sigma0))
+        return np.array([ua[0]-x0, ua[1]-y0, ub[2]-lam1T, ub[3]-lam2T])
+
+    tt = np.linspace(0,T,N+1)
+    uu = np.zeros((4,N+1))
+    xT = 1./sigma0 + 0.05
+    yT = 0.
+    if guess is not None:
+        #last = result.sol(tt)
+        uu[0,:] = guess[0,:]
+        uu[1,:] = guess[1,:]
+        uu[2,:] = guess[2,:]
+        uu[3,:] = guess[3,:]
+    else:
+        uu[0,:] = np.exp(-(beta-gamma)*tt/6)
+        uu[1,:] = 0.5*np.exp(-1.e-3*(tt-15)**2)
+        uu[2,:] = -c1
+
+    result = solve_bvp(rhs, bc, tt, uu, max_nodes=100000, tol=1.e-6, verbose=0)
+    if result.status == 1: 
+        print ('result.status: The maximum number of mesh nodes is exceeded.')
+    if result.status == 2: 
+        print ('result.status: A singular Jacobian encountered when solving the collocation system.')  
+        raise Exception('solve_bvp did not converge')
+    x = result.y[0,:]
+    y = result.y[1,:]
+    lam1 = result.y[2,:]
+    lam2 = result.y[3,:]
+
+    sigma = sigma0 - ((lam2-lam1)*gamma*y*x/(rho*c2))**(1/(rho-1))
+    sigma = np.maximum(sigma_min,np.minimum(sigma0,sigma))
+    t = result.x
+    #print(result.message)
+    return x, y, sigma, t, result.sol(tt)
 
 #def solve_hjb():
 
@@ -131,8 +188,7 @@ def plot_phaseplane(xs=None,ys=None,beta=0.3,gamma=0.1,color=None,labels=None):
     seed_points = np.array([x_points, y_points])
 
     plt.figure(figsize=(6,6))
-    plt.streamplot(X, Y, U, V, start_points=seed_points.T,integration_direction='forward',maxlength=1000,
-                   broken_streamlines=False,linewidth=1)
+    plt.streamplot(X, Y, U, V, start_points=seed_points.T,integration_direction='forward',maxlength=1000,linewidth=1)
     plt.plot([0,1],[1,0],'-k',alpha=0.5)
     if xs is not None:
         i = -1
