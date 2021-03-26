@@ -160,7 +160,7 @@ def plot_timeline(x,y,control,t):
     ax.plot(t,x)
     ax.plot(t,y)
     ax.plot(t,control)
-    ax.legend(['x','y','$\sigma/\sigma_0$']);
+    ax.legend(['s','i','$1-b/R0$']);
     plt.xlabel('t');
     ax.autoscale(enable=True, axis='x', tight=True)
     return fig
